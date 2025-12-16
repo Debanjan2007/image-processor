@@ -1,0 +1,34 @@
+version: 1.0.0
+name: image-processing-service
+
+services:
+  db:
+    image: mongodb/mongodb-community-server:7.0-ubi8
+    container_name: mongodb
+    ports:
+      - 27017:27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: roadmap
+      MONGO_INITDB_ROOT_PASSWORD: roadmapimageprocess123
+    restart: always
+    volumes:
+      - mongo_roadmap_db:/data/db
+  mongoui:
+    image: mongo-express
+    container_name: mongoUI
+    ports:
+      - 8081:8081
+    depends_on: 
+      - db
+    restart: always
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: roadmap
+      ME_CONFIG_MONGODB_ADMINPASSWORD: roadmapimageprocess123
+      ME_CONFIG_MONGODB_SERVER: db
+      ME_CONFIG_BASICAUTH_USERNAME: roadmapUser
+      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+
+
+volumes:
+  mongo_roadmap_db : 
+    driver: local
