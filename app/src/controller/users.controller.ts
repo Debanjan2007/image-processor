@@ -41,7 +41,6 @@ export interface imagemetadata {
     thumbnailUrl: string
 }
 export type AuthRequest = Request & { user?: dbuser };
-
 const genaccessToken = async function (uid: string): Promise<string | null | undefined> {
     try {
         const user: dbuser | null = await User.findOne({ uid: uid })
@@ -98,7 +97,7 @@ const loginUser = catchAsync(async (req, res) => {
         if (typeof (userDetails.username) !== 'string' || typeof (userDetails.password) !== 'string') {
             return sendError(res, "username or password is not a string", 400, null)
         }
-        const user: dbuser | null = await User.findOne({ username: userDetails.username })
+        const user: dbuser | null = await User.findOne({ username: userDetails.username }).select('-password -image')
         console.log(user);
         if (!user) {
             return sendError(res, "User not found", 404, null)
@@ -128,6 +127,7 @@ const loginUser = catchAsync(async (req, res) => {
         )
     }
 })
+// upload image
 const imageUploader = catchAsync(async (req: AuthRequest, res: Response) => {
     console.log(req.file?.path)
     try {
@@ -186,9 +186,80 @@ const imageUploader = catchAsync(async (req: AuthRequest, res: Response) => {
         return sendError(res, "Internal server error", 500, null)
     }
 })
-
+// get image by id
+const getImageById = catchAsync(async (req: Request, res: Response) => {
+    try {
+        const imageId: string | undefined = req.params.id;
+        if (!imageId || typeof (imageId) !== 'string') {
+            return sendError(res, "Invalid image id", 400, null)
+        }
+        // getting image from mongoDB by its fieldID 
+        const image = await User.aggregate([
+            {
+                $unwind: {
+                    path: "$image",
+                    includeArrayIndex: "imageIndex",
+                }
+            }, {
+                $match: {
+                    "image.fieldId": imageId
+                }
+            }, {
+                $project: {
+                    image: 1,
+                }
+            }
+        ]);
+        if (!image) {
+            return sendError(res, "Image not found", 404, null)
+        }
+        return sendSuccess(res, image[0].image, "Image fetched successfully from db", 200)
+    } catch (error) {
+        console.log(error);
+        return sendError(res, "Internal server error", 500, null)
+    }
+})
+// get images in list with pagination
+const getImageList = catchAsync(async (req: AuthRequest, res: Response) => {
+    try {
+        const page: number = req.query.page ? parseInt(req.query.page as string) : 1;
+        const limit: number = req.query.limit ? parseInt(req.query.limit as string) : 10;
+        const user = req.user as dbuser;
+        const images = await User.aggregate([
+            {
+                $match: {
+                    "uid": user.uid,
+                },
+            }
+            , {
+                $unwind: {
+                    path: "$image",
+                    includeArrayIndex: "imageIndex",
+                }
+            },{
+                $skip : ( page - 1 ) * limit 
+            }
+            , {
+                $project: {
+                    image: 1
+                }
+            } , {
+                $limit : limit
+            }
+        ])
+        if(!images){
+            return sendError(res, "No images found", 404, null);
+        }
+        return sendSuccess(res, images, "Images fetched successfully", 200)
+    } catch (error) {
+        console.log(error);
+        sendError(res, "Internal server error", 500, null);
+    }
+})
 export {
     reguser as reisterUser,
     loginUser,
-    imageUploader
+    imageUploader,
+    getImageById,
+    getImageList
 }

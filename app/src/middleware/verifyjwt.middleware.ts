@@ -15,19 +15,23 @@ export const verifyJwt = catchAsync(async (req : AuthRequest , res , next) => {
         if(!token || typeof(token) !== 'string'){
             return sendError(res , "Access token not found, please login again" , 401 , null)
         }
-        const secret = process.env.JWT_AUTH as string ;
+        const secret : string | undefined = process.env.JWT_AUTH as string ;
+        if(!secret){
+            throw new Error("JWT_SECRET not found in env variables")
+        }
         const decoded = jwt.verify(token , secret) as JwtPayload ;
         if(!decoded){
             return sendError(res , "Invalid token" , 401 , null)
         }
         const user = await User.findOne({ uid : decoded.uid }) as unknown as dbuser;
         if(!user){
-            return sendError(res , "User not found" , 404 , null)
+            return sendError(res , "User not found please sign up first" , 404 , null)
         }
         req.user = user;
         return next();
     } catch (error) {
         console.log(error);        
-        return sendError(res , "Internal server error" , 500 , null)
+        const errorMessage = error instanceof Error ? error.message : null;
+        return sendError(res, "Authentication failed", 401 , errorMessage);
     }
 })
